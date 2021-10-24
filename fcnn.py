@@ -51,7 +51,7 @@ class L2RegularizationLayer(keras.layers.Layer):
         return inputs
 
 
-# Create Model Object
+# Create Fully Connected Neural Network
 def createFCNN():
     fmodel = keras.Sequential(
         [
@@ -77,11 +77,11 @@ def getTensorData(val_size, x, y):
 
     # Prepare the training dataset.
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-    train_dataset = train_dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE)
+    train_dataset = train_dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
 
     # Prepare the validation dataset.
     val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val))
-    val_dataset = val_dataset.batch(BATCH_SIZE)
+    val_dataset = val_dataset.batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
     return train_dataset, val_dataset
 
 
