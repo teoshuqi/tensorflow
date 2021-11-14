@@ -14,20 +14,24 @@ UPDATE_COUNT = 4  # no. of times to update loss for each EPOCHS
 BUFFER_SIZE = 60000
 BATCH_SIZE = 32
 CLASSES = 10
+INPUT_DIM = 28
 VAL_SIZE = 0.2
 EPOCHS = 200
 LR = 9e-5
 DECAY_STEPS = 10000
 DECAY_RATE = 0.95
+DELTA = 0.1
+PATIENCE = 30
+
 
 # Variables
 wait = 0  # Early Stopping
 wait_loss = []
 history = {'train_acc': [], 'train_loss': [], 'val_loss': [], 'val_acc': [], 'optimizer': []}
 model_dir = './'
-MODEL_FILENAME = model_dir + 'test_model.h5'
-METRICS_FILENAME = model_dir + 'test_metrics.png'
-RESULTS_FILENAME = model_dir + 'test_results.png'
+MODEL_FILENAME = model_dir + 'fcnn_model.h5'
+METRICS_FILENAME = model_dir + 'fcnn_metrics.png'
+RESULTS_FILENAME = model_dir + 'fcnn_results.png'
 
 
 # Instantiate regularisation layer
@@ -55,10 +59,14 @@ class L2RegularizationLayer(keras.layers.Layer):
 def createFCNN():
     fmodel = keras.Sequential(
         [
-            keras.Input(shape=(784,), name="digits"),
+            keras.Input(shape=(INPUT_DIM**2,), name="digits"),
+            keras.layers.Rescaling(scale=1.0 / 255),
             keras.layers.Dense(32, activation="relu"),
+            keras.layers.BatchNormalization(),
             keras.layers.Dense(32, activation="relu"),
+            keras.layers.BatchNormalization(),
             keras.layers.Dense(32, activation="relu"),
+            keras.layers.BatchNormalization(),
             keras.layers.Dense(10, activation='softmax', name="predictions")
         ]
     )
@@ -77,11 +85,11 @@ def getTensorData(val_size, x, y):
 
     # Prepare the training dataset.
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
-    train_dataset = train_dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
+    train_dataset = train_dataset.shuffle(buffer_size=BUFFER_SIZE).batch(BATCH_SIZE).prefetch(buffer_size=tf.data.AUTOTUNE)
 
     # Prepare the validation dataset.
     val_dataset = tf.data.Dataset.from_tensor_slices((x_val, y_val))
-    val_dataset = val_dataset.batch(BATCH_SIZE).prefetch(buffer_size=AUTOTUNE)
+    val_dataset = val_dataset.batch(BATCH_SIZE).prefetch(buffer_size=tf.data.AUTOTUNE)
     return train_dataset, val_dataset
 
 
@@ -145,6 +153,7 @@ def plotMetrics(history, filename=''):
     axes[1].plot(train_loss)
     axes[1].plot(val_loss)
 
+    axes[2].set_ylim([0, 100])
     axes[2].set_ylabel("Accuracy", fontsize=14)
     axes[2].set_xlabel("Epoch", fontsize=14)
     axes[2].plot(train_acc)
@@ -193,6 +202,7 @@ val_acc_metric = keras.metrics.SparseCategoricalAccuracy()
 train_loss_metric = keras.metrics.Mean()
 val_loss_metric = keras.metrics.Mean()
 
+print('Prepare Data')
 # Prepare the training dataset.
 (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
 x_train = np.reshape(x_train, (-1, 784))  # Flatten dataset for fcnn model
@@ -250,7 +260,7 @@ for epoch in range(EPOCHS):
     print("Time taken: %.2fs" % (time.time() - start_time))
 
     # Early Stopping
-    earlyStop = earlyStopLoss(history['val_loss'], delta=0.2, patience=20)
+    earlyStop = earlyStopLoss(history['val_loss'], delta=DELTA, patience=PATIENCE)
     if earlyStop:
         print('Loss not decreasing. Stopping training')
         break
