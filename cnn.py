@@ -14,11 +14,14 @@ UPDATE_COUNT = 2  # no. of times to update loss for each EPOCHS
 BUFFER_SIZE = 60000
 BATCH_SIZE = 32
 CLASSES = 10
+INPUT_DIM = 28
 VAL_SIZE = 0.2
 EPOCHS = 200
 LR = 9e-5
 DECAY_STEPS = 10000
 DECAY_RATE = 0.95
+DELTA = 0.1
+PATIENCE = 30
 
 # Variables
 wait = 0  # Early Stopping
@@ -51,17 +54,19 @@ class L2RegularizationLayer(keras.layers.Layer):
         return inputs
 
 
-# Create Fully Connected Neural Network
+# Create Convolutional Neural Network
 def createCNN():
     fmodel = keras.Sequential(
         [
             keras.layers.RandomRotation(0.2, input_shape = (28, 28, 1)),
             keras.layers.RandomTranslation(height_factor=(-0.2, 0.2), width_factor=(-0.2, 0.2)),
             keras.layers.Rescaling(scale=1.0/255),
-            keras.layers.Conv2D(32, (3, 3), activation='relu'),
+            keras.layers.Conv2D(64, (3, 3), activation='relu'),
             keras.layers.MaxPooling2D((2, 2)),
-            keras.layers.Conv2D(32, (3, 3), activation='relu'),
+            keras.layers.BatchNormalization(),
+            keras.layers.Conv2D(64, (3, 3), activation='relu'),
             keras.layers.MaxPooling2D((2, 2)),
+            keras.layers.BatchNormalization(),
             keras.layers.Flatten(),
             keras.layers.Dense(32, activation="relu"),
             keras.layers.Dense(10, activation='softmax', name="predictions")
@@ -150,6 +155,7 @@ def plotMetrics(history, filename=''):
     axes[1].plot(train_loss)
     axes[1].plot(val_loss)
 
+    axes[2].set_ylim([0, 100])
     axes[2].set_ylabel("Accuracy", fontsize=14)
     axes[2].set_xlabel("Epoch", fontsize=14)
     axes[2].plot(train_acc)
@@ -198,6 +204,7 @@ val_acc_metric = keras.metrics.SparseCategoricalAccuracy()
 train_loss_metric = keras.metrics.Mean()
 val_loss_metric = keras.metrics.Mean()
 
+print('Prepare Data')
 # Prepare the training dataset.
 (x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
 x_train = np.reshape(x_train, (-1, 28, 28, 1)) # Reshape for CNN
@@ -255,7 +262,7 @@ for epoch in range(EPOCHS):
     print("Time taken: %.2fs" % (time.time() - start_time))
 
     # Early Stopping
-    earlyStop = earlyStopLoss(history['val_loss'], delta=0.2, patience=20)
+    earlyStop = earlyStopLoss(history['val_loss'], delta=DELTA, patience=PATIENCE)
     if earlyStop:
         print('Loss not decreasing. Stopping training')
         break
